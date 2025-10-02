@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ProNome — Poly4 Compact + Visuals (Multi-Layer Circle)</title>
+<style>
+  :root{
+    --bg:#0b0f0c;--panel:#111718;--panel2:#0e1416;--ink:#e8f5e9;--muted:#9fb3a9;--line:rgba(255,255,255,.08);
+    --g1:#00e676;--g2:#29b6f6;--g3:#ffd54f;--g4:#ff8a65;--danger:#ff5252;--r:14px;--shadow:0 8px 22px rgba(0,0,0,.45)
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:#0b0f0c;color:var(--ink);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:980px;margin:22px auto;padding:12px}
+  h1{margin:0 0 6px;font-size:22px;letter-spacing:.3px;background:linear-gradient(90deg,var(--g1),#b2ff59 40%,var(--g1));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+
+  .grid{display:grid;grid-template-columns:1fr auto;gap:12px}
+  @media (max-width: 720px){
+    .grid{grid-template-columns:1fr}
+    .sideCard{max-width:260px;justify-self:center}
+  }
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:var(--r);padding:12px;box-shadow:var(--shadow)}
+
+  label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+  input[type="number"], select {
+    width:100%;padding:6px 8px;border-radius:10px;background:#0b1314;color:var(--ink);
+    border:1px solid var(--line);outline:none;font-size:13px
+  }
+  input[type="range"]{width:100%}
+  .num.sm{max-width:70px}
+  .row{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px;margin-bottom:8px}
+  .row3{display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:10px;margin-bottom:8px}
+
+  .switch{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#0b1314;border:1px solid var(--line)}
+  .badge{font-size:11px;color:#0b0f0c;background:#cde7df;border:0;padding:4px 7px;border-radius:999px;font-weight:800;white-space:nowrap}
+  .bpmBadge{background:#1b4}
+
+  .layers{display:grid;grid-template-columns:1fr;gap:8px}
+  .layer{
+    display:grid;grid-template-columns:76px 18px 72px 86px 60px 54px 90px;
+    gap:10px;align-items:end;padding:8px;border-radius:12px;border:1px solid var(--line);background:#0b1314
+  }
+  .tag{font-size:11px;color:#0b0f0c;padding:5px 8px;border-radius:999px;font-weight:800;justify-self:start;text-align:center}
+  .l1{background:var(--g1)} .l2{background:var(--g2)} .l3{background:var(--g3)} .l4{background:var(--g4)}
+  .pulseDot{width:12px;height:12px;border-radius:50%;opacity:.25;transition:transform 50ms ease-out, opacity 120ms ease}
+  .pd1{background:var(--g1)} .pd2{background:var(--g2)} .pd3{background:var(--g3)} .pd4{background:var(--g4)}
+  .pulseOn{transform:scale(1.3);opacity:1}
+
+  .vwrap{display:flex;justify-content:center}
+  input[type="range"].vertical{
+    writing-mode: bt-lr; -webkit-appearance: slider-vertical;
+    width:20px;height:84px;padding:0;margin:0;
+  }
+  @supports not (-webkit-appearance: slider-vertical) {
+    input[type="range"].vertical{transform:rotate(-90deg);width:84px;height:20px}
+  }
+
+  /* Step lights: 4 horizontal rows × 16 lights */
+  .steps{display:grid;grid-template-rows:repeat(4, 1fr);gap:6px;margin:6px 0 10px}
+  .rowSteps{display:grid;grid-template-columns:repeat(16, 1fr);gap:4px}
+  .cell{height:10px;border-radius:3px;background:#22302d;opacity:.45;transition:opacity .06s ease, filter .06s ease}
+  .c1{background:#113a2a} .c2{background:#0c2a3b} .c3{background:#3c3510} .c4{background:#3b1f16}
+  .on{opacity:1;filter:brightness(1.8)}
+
+  /* Right-side compact circle */
+  .sideCard{width:240px}
+  .stage{
+    width:240px;padding-top:8px;position:relative;border-radius:14px;border:1px solid var(--line);
+    background:radial-gradient(420px 260px at 50% 35%,#0c1416,#091112 70%);overflow:hidden;justify-self:end
+  }
+  .stageHead{position:absolute;left:8px;top:6px;color:var(--muted);font-size:11px}
+  .ring{width:160px;height:160px;margin:28px auto 8px auto;border-radius:50%;
+    border:2px dashed rgba(255,255,255,.08);display:grid;place-items:center;position:relative}
+  .circle{position:relative;width:140px;height:140px}
+  .marker{position:absolute;width:7px;height:7px;border-radius:50%;opacity:.9}
+  .m1{background:var(--g1)} .m2{background:var(--g2)} .m3{background:var(--g3)} .m4{background:var(--g4)}
+  .marker.active{box-shadow:0 0 10px rgba(255,255,255,.7);filter:brightness(1.8)}
+
+  /* KPIs under circle, two rows, fixed widths to prevent wiggle */
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0}
+  .kpi{background:#0a1213;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+  .kpi .label{color:#8aa79b;font-size:10px;margin-bottom:4px}
+  .kpi .value{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+  #measureSec.value, #actVal.value, #statVal.value, #nextVal.value{min-width:74px;display:inline-block}
+
+  .controlsUnder{display:flex;gap:8px;justify-content:space-between;margin-top:2px}
+  .btn{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#152325;color:var(--ink);font-weight:700;cursor:pointer;font-size:13px}
+  .btn.primary{background:linear-gradient(180deg,#0a2a23,#0f3a30)}
+  .btn.stop{background:linear-gradient(180deg,#2a0a0a,#3a0f0f)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ProNome — Poly4 Compact + Visuals (Multi-Layer Circle)</h1>
+  <div class="sub">Circle shows every enabled layer at once — each lights its own step. No layers cancel each other.</div>
+
+  <div class="grid">
+    <!-- Left: Controls + step lights -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="bpmRange">BPM <span id="bpmLabel">(144)</span></label>
+          <input id="bpmRange" type="range" min="20" max="300" step="1" value="144"/>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+            <label for="bpmInput" style="margin:0">BPM</label>
+            <span id="bpmBadge" class="badge bpmBadge">144 BPM</span>
+          </div>
+          <input id="bpmInput" class="num sm" type="number" min="20" max="300" step="1" value="144"/>
+        </div>
+      </div>
+      <div class="row3">
+        <div>
+          <label for="measureBeats">Measure beats</label>
+          <input id="measureBeats" class="num sm" type="number" min="1" max="32" step="1" value="4"/>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <span id="measureBadge" class="badge">/4</span>
+        </div>
+        <div><!-- spare --></div>
+      </div>
+
+      <!-- Step lights -->
+      <div id="steps" class="steps"></div>
+
+      <div id="layers" class="layers"></div>
+    </div>
+
+    <!-- Right: Circle + KPIs + Start/Stop -->
+    <div class="card sideCard">
+      <div class="stage">
+        <div class="stageHead">Layer circle</div>
+        <div class="ring"><div id="circle" class="circle"></div></div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="label">Measure (s)</div><div id="measureSec" class="value">—</div></div>
+        <div class="kpi"><div class="label">Active</div><div id="actVal" class="value">0</div></div>
+        <div class="kpi"><div class="label">Status</div><div id="statVal" class="value">Idle</div></div>
+        <div class="kpi"><div class="label">Next Tick</div><div id="nextVal" class="value">0.000 s</div></div>
+      </div>
+
+      <div class="controlsUnder">
+        <button id="startBtn" class="btn primary" style="width:100%">Start</button>
+        <button id="stopBtn"  class="btn stop"    style="width:100%">Stop</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===== Utils
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+  const fmt2  = (x)=> (Math.round(x*100)/100).toFixed(2);
+
+  // ===== State
+  let bpm = 144;
+  let measureBeats = 4;
+  const MAX_BEATS = 16, STEP_CELLS = 16;
+
+  const defaultLayers = [
+    { name:'L1', beats:3, enabled:true,  accent:true, vol:0.65, sound:'HiClick' },
+    { name:'L2', beats:2, enabled:true,  accent:true, vol:0.55, sound:'LowClick' },
+    { name:'L3', beats:4, enabled:false, accent:true, vol:0.50, sound:'Kick'    },
+    { name:'L4', beats:5, enabled:false, accent:true, vol:0.50, sound:'Snare'   },
+  ];
+  const SOUND_OPTIONS = ['HiClick','LowClick','Wood','Beep','Noise','Kick','Snare','HiHat','Ride','Tom'];
+
+  // runtime per layer
+  const rt = defaultLayers.map(() => ({
+    nextTime: 0, period: 0, idx: 0, gain: null, rowCells: [], pulse: null
+  }));
+
+  // DOM refs
+  const bpmRange = document.getElementById('bpmRange');
+  const bpmInput = document.getElementById('bpmInput');
+  const bpmLabel = document.getElementById('bpmLabel');
+  const bpmBadge = document.getElementById('bpmBadge');
+  const measureBeatsInput = document.getElementById('measureBeats');
+  const measureBadge = document.getElementById('measureBadge');
+  const measureSec = document.getElementById('measureSec');
+  const layersEl = document.getElementById('layers');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn  = document.getElementById('stopBtn');
+  const nextVal  = document.getElementById('nextVal');
+  const actVal   = document.getElementById('actVal');
+  const statVal  = document.getElementById('statVal');
+
+  const circle = document.getElementById('circle');
+  const stepsRoot = document.getElementById('steps');
+
+  // Audio
+  let audioCtx = null;
+  const soundBank = {};
+  let timerId = null;
+  const LOOKAHEAD_MS = 12, AHEAD_SEC = 0.10;
+
+  // ===== Audio makers
+  function initAudio(){
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    soundBank.HiClick  = makeClickPair({normalFreq:1600, accentFreq:2200});
+    soundBank.LowClick = makeClickPair({normalFreq:1000, accentFreq:1400});
+    soundBank.Wood     = makeWoodblockPair();
+    soundBank.Beep     = makeBeepPair();
+    soundBank.Noise    = makeNoisePair();
+    soundBank.Kick     = makeKickPair();
+    soundBank.Snare    = makeSnarePair();
+    soundBank.HiHat    = makeHiHatPair();
+    soundBank.Ride     = makeRidePair();
+    soundBank.Tom      = makeTomPair();
+
+    for (let i=0;i<rt.length;i++){
+      const g = audioCtx.createGain();
+      g.gain.value = defaultLayers[i].vol;
+      g.connect(audioCtx.destination);
+      rt[i].gain = g;
+    }
+  }
+  function makeBuffer(lenSec, fn){
+    const sr = 44100, len = Math.floor(sr*lenSec);
+    const buf = audioCtx.createBuffer(1, len, sr);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<len;i++){ const t=i/sr; data[i]=fn(t); }
+    return buf;
+  }
+  const expo = (r)=> (t)=> Math.exp(-r*t);
+  function makeClickPair({normalFreq=1600, accentFreq=2200}={}){
+    const envN = expo(40), envA = expo(45);
+    return {
+      normalBuf: makeBuffer(0.022, t => Math.sin(2*Math.PI*normalFreq*t)*envN(t)),
+      accentBuf: makeBuffer(0.018, t => Math.sin(2*Math.PI*accentFreq*t)*envA(t))
+    };
+  }
+  function makeBeepPair(){ const envN=expo(18), envA=expo(22);
+    return { normalBuf: makeBuffer(0.05, t => Math.sin(2*Math.PI*660*t)*envN(t)),
+             accentBuf: makeBuffer(0.05, t => Math.sin(2*Math.PI*880*t)*envA(t)) }; }
+  function makeWoodblockPair(){ const envN=expo(55), envA=expo(65), sq=x=> (x%1)<0.5?1:-1;
+    return { normalBuf: makeBuffer(0.028, t => sq(20*t)*envN(t)),
+             accentBuf: makeBuffer(0.028, t => sq(26*t)*envA(t)) }; }
+  function makeNoisePair(){ const envN=expo(65), envA=expo(75);
+    return { normalBuf: makeBuffer(0.02, t => (Math.random()*2-1)*envN(t)),
+             accentBuf: makeBuffer(0.02, t => (Math.random()*2-1)*envA(t)) }; }
+  function makeKickPair(){ return {
+      normalBuf: makeBuffer(0.09, t => Math.sin(2*Math.PI*(120 - 65*t)*t) * Math.exp(-28*t)),
+      accentBuf: makeBuffer(0.11, t => Math.sin(2*Math.PI*(140 - 80*t)*t) * Math.exp(-24*t))
+    }; }
+  function makeSnarePair(){ const envN=expo(60), envA=expo(70), click=(t,f)=>Math.sin(2*Math.PI*f*t)*Math.exp(-60*t);
+    return { normalBuf: makeBuffer(0.06, t => (Math.random()*2-1)*envN(t) + 0.35*click(t,1800)),
+             accentBuf: makeBuffer(0.07, t => (Math.random()*2-1)*envA(t) + 0.45*click(t,2200)) }; }
+  function makeHiHatPair(){ const envN=expo(120), envA=expo(140);
+    return { normalBuf: makeBuffer(0.025, t => (Math.random()*2-1)*envN(t)),
+             accentBuf: makeBuffer(0.03,  t => (Math.random()*2-1)*envA(t)) }; }
+  function makeRidePair(){ const envN=expo(18), envA=expo(20);
+    return { normalBuf: makeBuffer(0.25, t => (Math.sin(2*Math.PI*1100*t)+0.5*Math.sin(2*Math.PI*1500*t))*envN(t)),
+             accentBuf: makeBuffer(0.32, t => (Math.sin(2*Math.PI*1300*t)+0.6*Math.sin(2*Math.PI*1800*t))*envA(t)) }; }
+  function makeTomPair(){ return {
+      normalBuf: makeBuffer(0.12, t => Math.sin(2*Math.PI*(180 - 20*t)*t) * Math.exp(-22*t)),
+      accentBuf: makeBuffer(0.14, t => Math.sin(2*Math.PI*(210 - 25*t)*t) * Math.exp(-20*t))
+    }; }
+  function schedule(buf, when, gain){
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(gain); src.start(when);
+  }
+
+  // ===== UI
+  function renderLayerRow(i){
+    const L = defaultLayers[i];
+    const row = document.createElement('div'); row.className='layer';
+
+    const tag = document.createElement('div'); tag.className='tag l'+(i+1); tag.textContent=L.name; row.appendChild(tag);
+    const pd  = document.createElement('div'); pd.className='pulseDot pd'+(i+1); row.appendChild(pd); rt[i].pulse = pd;
+
+    const beatsCtl = document.createElement('div');
+    beatsCtl.innerHTML = `<label>Beats</label><input class="num sm" id="bt_${i}" type="number" min="1" max="${MAX_BEATS}" step="1" value="${L.beats}">`;
+    row.appendChild(beatsCtl);
+
+    const sndCtl = document.createElement('div');
+    const opts = SOUND_OPTIONS.map(s=>`<option ${s===L.sound?'selected':''} value="${s}">${s}</option>`).join('');
+    sndCtl.innerHTML = `<label>Sound</label><select id="sd_${i}">${opts}</select>`;
+    row.appendChild(sndCtl);
+
+    const accCtl = document.createElement('div');
+    accCtl.innerHTML = `<label>Accent</label><span class="switch"><input type="checkbox" id="ac_${i}" ${L.accent?'checked':''}><span>1</span></span>`;
+    row.appendChild(accCtl);
+
+    const enCtl = document.createElement('div');
+    enCtl.innerHTML = `<label>Enable</label><span class="switch"><input type="checkbox" id="en_${i}" ${L.enabled?'checked':''}><span>On</span></span>`;
+    row.appendChild(enCtl);
+
+    const volCtl = document.createElement('div'); volCtl.className='vwrap';
+    volCtl.innerHTML = `<input id="vl_${i}" class="vertical" type="range" min="0" max="1" step="0.01" value="${L.vol}" title="Vol">`;
+    row.appendChild(volCtl);
+
+    // events → rebuild circle when beats or enabled change
+    row.querySelector('#bt_'+i).addEventListener('input', e=>{
+      L.beats = clamp(Number(e.target.value||1),1,MAX_BEATS);
+      e.target.value = L.beats; rebuildPeriods(true); rebuildCircle();
+    });
+    row.querySelector('#sd_'+i).addEventListener('change', e=>{ L.sound = e.target.value; });
+    row.querySelector('#ac_'+i).addEventListener('change', e=>{ L.accent = !!e.target.checked; });
+    row.querySelector('#en_'+i).addEventListener('change', e=>{
+      L.enabled = !!e.target.checked; rebuildPeriods(true); rebuildCircle(); updateActive();
+    });
+    row.querySelector('#vl_'+i).addEventListener('input', e=>{
+      const v = Number(e.target.value); L.vol = v;
+      if (rt[i].gain && audioCtx) rt[i].gain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.001);
+    });
+
+    return row;
+  }
+
+  function buildLayerUI(){
+    layersEl.innerHTML = '';
+    for (let i=0;i<defaultLayers.length;i++) layersEl.appendChild(renderLayerRow(i));
+    buildStepLights();
+    updateMeasureInfo(); updateActive(); rebuildCircle();
+  }
+
+  // Step lights
+  function buildStepLights(){
+    stepsRoot.innerHTML = '';
+    for (let i=0;i<defaultLayers.length;i++){
+      const row = document.createElement('div'); row.className='rowSteps';
+      rt[i].rowCells = [];
+      for (let k=0;k<STEP_CELLS;k++){
+        const c = document.createElement('div'); c.className='cell c'+(i+1);
+        row.appendChild(c); rt[i].rowCells.push(c);
+      }
+      stepsRoot.appendChild(row);
+    }
+  }
+  function flashStep(i, beatIndex, beatsInLayer){
+    const cells = rt[i].rowCells; if (!cells || !cells.length) return;
+    const pos = Math.floor((beatIndex / beatsInLayer) * STEP_CELLS) % STEP_CELLS;
+    cells.forEach((el, idx)=> el.classList.toggle('on', idx===pos));
+    setTimeout(()=> { if (cells[pos]) cells[pos].classList.remove('on'); }, 80);
+  }
+
+  // ===== Circle — show ALL enabled layers
+  let circleMarkers = [[],[],[],[]]; // per-layer arrays of nodes
+  function rebuildCircle(){
+    circle.innerHTML = '';
+    circleMarkers = [[],[],[],[]];
+    const size = 140, cx = size/2, cy = size/2;
+    // concentric radii for layers (outer to inner)
+    const baseR = 60, stepR = 8;
+
+    defaultLayers.forEach((L, i)=>{
+      if (!L.enabled || !L.beats) return;
+      const r = baseR - i*stepR;
+      for (let k=0;k<L.beats;k++){
+        const ang = (k/L.beats)*Math.PI*2 - Math.PI/2;
+        const x = Math.cos(ang)*r + cx, y = Math.sin(ang)*r + cy;
+        const d = document.createElement('div'); d.className='marker m'+(i+1);
+        d.style.left = (x - 3)+'px'; d.style.top = (y - 3)+'px';
+        d.dataset.idx = k; if (k===0) d.classList.add('active');
+        circle.appendChild(d);
+        circleMarkers[i].push(d);
+      }
+    });
+  }
+  function setCircleActive(layerIndex, beatIdx){
+    const arr = circleMarkers[layerIndex]; if (!arr || !arr.length) return;
+    for (const m of arr) m.classList.remove('active');
+    const node = arr.find(n=> Number(n.dataset.idx)===beatIdx);
+    if (node) node.classList.add('active');
+  }
+
+  // ===== Timing / Periods
+  function updateMeasureInfo(){
+    const secPerBeat = 60 / Math.max(1,bpm);
+    const measureSeconds = measureBeats * secPerBeat;
+    measureSec.textContent = fmt2(measureSeconds)+' s';
+    measureBadge.textContent = '/'+measureBeats;
+    return {measureSeconds};
+  }
+  function updateActive(){ actVal.textContent = String(defaultLayers.filter(L=>L.enabled).length); }
+  function rebuildPeriods(resetTimes){
+    const {measureSeconds} = updateMeasureInfo();
+    for (let i=0;i<defaultLayers.length;i++){
+      const L = defaultLayers[i], R = rt[i];
+      if (!L.enabled || !L.beats){ R.period = 0; continue; }
+      R.period = measureSeconds / L.beats;
+      if (resetTimes && audioCtx){ R.idx = -1; R.nextTime = audioCtx.currentTime + 0.08; }
+    }
+  }
+
+  // ===== Scheduler
+  function scheduler(){
+    const now = audioCtx.currentTime;
+    let soonest = Infinity;
+
+    for (let i=0;i<defaultLayers.length;i++){
+      const L = defaultLayers[i], R = rt[i];
+      if (!L.enabled || !R.period) continue;
+      if (R.nextTime === 0) R.nextTime = now + 0.08;
+
+      while (R.nextTime < now + AHEAD_SEC){
+        R.idx = (R.idx + 1) % L.beats;
+
+        const bank = soundBank[L.sound] || soundBank.HiClick;
+        const buf  = (L.accent && R.idx === 0) ? bank.accentBuf : bank.normalBuf;
+        schedule(buf, R.nextTime, R.gain);
+
+        ((layerIndex, beatIdx, beatsInLayer, when)=>{
+          const delay = Math.max(0, (when - audioCtx.currentTime)*1000 - 2);
+          setTimeout(()=> {
+            const pd = rt[layerIndex].pulse;
+            if (pd){ pd.classList.add('pulseOn'); setTimeout(()=>pd.classList.remove('pulseOn'), 70); }
+            setCircleActive(layerIndex, beatIdx);
+            flashStep(layerIndex, beatIdx, beatsInLayer);
+          }, delay);
+        })(i, R.idx, L.beats, R.nextTime);
+
+        R.nextTime += R.period;
+      }
+      if (R.nextTime < soonest) soonest = R.nextTime;
+    }
+    nextVal.textContent = (isFinite(soonest) ? (soonest - now).toFixed(3) : '0.000')+' s';
+  }
+
+  function start(){
+    if (timerId) return;
+    initAudio();
+    statVal.textContent = 'Running';
+    rebuildPeriods(true);
+    timerId = setInterval(scheduler, LOOKAHEAD_MS);
+  }
+  function stop(){
+    if (!timerId) return;
+    clearInterval(timerId); timerId=null;
+    statVal.textContent = 'Stopped';
+    rt.forEach(r => r.rowCells.forEach(c=>c.classList.remove('on')));
+  }
+
+  // ===== Wire-up
+  bpmRange.addEventListener('input', e=>{
+    bpm = clamp(Number(e.target.value),20,300);
+    bpmInput.value = bpm; bpmLabel.textContent = '('+bpm+')';
+    bpmBadge.textContent = `${bpm} BPM`; rebuildPeriods(true);
+  });
+  bpmInput.addEventListener('input', e=>{
+    bpm = clamp(Number(e.target.value||0),20,300);
+    bpmRange.value = bpm; bpmLabel.textContent = '('+bpm+')';
+    bpmBadge.textContent = `${bpm} BPM`; rebuildPeriods(true);
+  });
+  measureBeatsInput.addEventListener('input', e=>{
+    measureBeats = clamp(Number(e.target.value||4),1,32);
+    e.target.value = measureBeats; rebuildPeriods(true); rebuildCircle();
+  });
+  startBtn.addEventListener('click', start);
+  stopBtn .addEventListener('click', stop);
+
+  // init
+  buildLayerUI(); rebuildPeriods(false); rebuildCircle();
+})();
+</script>
+</body>
+</html>
