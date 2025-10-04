@@ -193,29 +193,32 @@
   const STEP_CELLS = 32;
   const MAX_BEATS  = 32;
 
-  // Sounds (renamed per your spec)
+  // Sounds (parenthetical descriptions removed, High Tom added)
   const SOUND_LABELS = [
-    ['woodblock','Woodblock'],   // replaces Hi Click
-    ['cowbell','Cowbell'],       // replaces Ride
-    ['shaker','Shaker (noise)'], // replaces weak Wood
-    ['nclap','Noise Clap'],      // replaces weak Sound
+    ['woodblock','Woodblock'],
+    ['cowbell','Cowbell'],
+    ['hightom','High Tom'], 
+    ['shaker','Shaker'],
+    ['nclap','Noise Clap'],
     ['hihat','Hi-hat'],
     ['snare','Snare'],
     ['kick','Bass Drum'],
-    ['tom','Tom']
+    ['tom','Low Tom']
   ];
 
   const defaultLayers = [
-    { name:'L1', beats:4, enabled:true,  accent:true, vol:0.65, sound:'woodblock' },
-    { name:'L2', beats:3, enabled:true,  accent:true, vol:0.55, sound:'cowbell'   },
-    { name:'L3', beats:5, enabled:false, accent:true, vol:0.50, sound:'kick'      },
-    { name:'L4', beats:7, enabled:false, accent:true, vol:0.50, sound:'snare'     },
+    { name:'L1', beats:4, enabled:true,  accent:true, vol:0.65, sound:'kick' },
+    { name:'L2', beats:3, enabled:true,  accent:true, vol:0.55, sound:'snare'   },
+    { name:'L3', beats:5, enabled:false, accent:true, vol:0.50, sound:'hihat'      },
+    { name:'L4', beats:7, enabled:false, accent:true, vol:0.50, sound:'shaker'     },
   ];
 
   // runtime
   const rt = defaultLayers.map(()=>({ nextTime:0, period:0, idx:0, gain:null, rowCells:[], pulse:null }));
-  let audioCtx=null; const bank={};
-  let timerId=null; const LOOKAHEAD_MS=12, AHEAD_SEC=0.10;
+  let audioCtx=null; 
+  let bank={}; // Will hold pointers to instrument functions
+  let timerId=null; 
+  const LOOKAHEAD_MS=12, AHEAD_SEC=0.10;
 
   // DOM refs
   const stepsRoot = document.getElementById('steps');
@@ -243,83 +246,276 @@
   const stopBtn   = document.getElementById('stopBtn');
 
   // ===== Audio init + synths
+
   function initAudio(){
     if (audioCtx) return;
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    bank.kick      = kick();
-    bank.snare     = snare();
-    bank.hihat     = hihat();
-    bank.cowbell   = cowbell();
-    bank.woodblock = woodblock();
-    bank.shaker    = shaker();
-    bank.nclap     = nclap();
-    bank.tom       = tom();
-    rt.forEach((r,i)=>{ const g = audioCtx.createGain(); g.gain.value = defaultLayers[i].vol; g.connect(audioCtx.destination); r.gain = g; });
+    
+    // Map instrument names to their playing functions
+    bank.kick      = playBass;    
+    bank.snare     = playSnare;   
+    bank.hihat     = playHiHat;   
+    bank.cowbell   = playCowbell; 
+    bank.woodblock = playWoodBlock; 
+    bank.shaker    = playShaker;  
+    bank.nclap     = playClap;    
+    bank.tom       = playLowTom;
+    bank.hightom   = playHighTom; 
+    
+    // Set up gain nodes for each layer
+    rt.forEach((r,i)=>{ 
+        const g = audioCtx.createGain(); 
+        g.gain.value = defaultLayers[i].vol; 
+        g.connect(audioCtx.destination); 
+        r.gain = g; 
+    });
   }
-  function envExp(rate){ return t => Math.exp(-rate*t); }
-  function makeBuf(lenSec, fn){
-    const sr=44100,len=Math.floor(sr*lenSec);
-    const b=audioCtx.createBuffer(1,len,sr), d=b.getChannelData(0);
-    for(let i=0;i<len;i++){ d[i]=fn(i/sr); }
-    return b;
-  }
-  function schedule(buf, when, gain){ const s=audioCtx.createBufferSource(); s.buffer=buf; s.connect(gain); s.start(when); }
 
-  // Instruments
-  function kick(){ // bassier
-    return {
-      normal: makeBuf(0.11, t=> Math.sin(2*Math.PI*(90 - 52*t)*t) * Math.exp(-24*t) + 0.05*Math.sin(2*Math.PI*1200*t)*Math.exp(-80*t)),
-      accent: makeBuf(0.14, t=> Math.sin(2*Math.PI*(110 - 70*t)*t) * Math.exp(-22*t) + 0.06*Math.sin(2*Math.PI*1400*t)*Math.exp(-90*t))
-    };
+  // Helper to create a basic noise buffer
+  function getNoiseBuffer(duration = 0.5) {
+      const sampleRate = audioCtx.sampleRate;
+      const bufferSize = duration * sampleRate;
+      const buffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1; // White Noise
+      }
+      return buffer;
   }
-  function snare(){
-    const e1=envExp(60), e2=envExp(70), click=(t,f)=>Math.sin(2*Math.PI*f*t)*Math.exp(-60*t);
-    return {
-      normal: makeBuf(0.06, t => (Math.random()*2-1)*e1(t) + 0.35*click(t,1800)),
-      accent: makeBuf(0.07, t => (Math.random()*2-1)*e2(t) + 0.45*click(t,2200))
-    };
+
+  // All instrument functions take (time, destNode, isAccent)
+  
+  // 1. Kick/Bass Drum
+  function playBass(time, destNode, isAccent) {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = 'sine'; 
+      const baseFreq = isAccent ? 50 : 40;
+      const peakGain = isAccent ? 1.0 : 0.9;
+      const decayTime = isAccent ? 0.45 : 0.4;
+
+      osc.frequency.setValueAtTime(baseFreq, time); 
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      osc.connect(gainNode).connect(destNode);
+      osc.start(time);
+      osc.stop(time + decayTime + 0.1);
   }
-  function hihat(){
-    const e1=envExp(120), e2=envExp(140);
-    return {
-      normal: makeBuf(0.025, t => (Math.random()*2-1)*e1(t)),
-      accent: makeBuf(0.03,  t => (Math.random()*2-1)*e2(t))
-    };
+
+  // 2. Snare 
+  function playSnare(time, destNode, isAccent) {
+      // 1. Noise component (for 'ch' texture)
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = getNoiseBuffer(0.2);
+      const noiseGain = audioCtx.createGain();
+      const highpass = audioCtx.createBiquadFilter();
+      
+      const noisePeak = isAccent ? 0.6 : 0.45;
+      const noiseDecay = isAccent ? 0.12 : 0.1;
+
+      noiseGain.gain.setValueAtTime(noisePeak, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, time + noiseDecay); 
+
+      highpass.type = 'highpass';
+      highpass.frequency.setValueAtTime(5000, time);
+
+      // 2. Tone component (for the hit)
+      const osc = audioCtx.createOscillator();
+      const oscGain = audioCtx.createGain();
+
+      osc.type = 'triangle';
+      const oscFreq = isAccent ? 250 : 200;
+      const oscPeak = isAccent ? 0.8 : 0.6;
+      const oscDecay = isAccent ? 0.06 : 0.05;
+
+      osc.frequency.setValueAtTime(oscFreq, time);
+      oscGain.gain.setValueAtTime(oscPeak, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, time + oscDecay);
+
+      // Connect
+      osc.connect(oscGain);
+      noise.connect(highpass).connect(noiseGain);
+      
+      const merger = audioCtx.createChannelMerger(2);
+      oscGain.connect(merger, 0, 0);
+      noiseGain.connect(merger, 0, 1);
+      merger.connect(destNode);
+
+      osc.start(time);
+      noise.start(time);
+      osc.stop(time + 0.1);
+      noise.stop(time + 0.2);
   }
-  function cowbell(){ // replaces Ride
-    return {
-      normal: makeBuf(0.20, t => (square(560*t)+square(845*t))*Math.exp(-18*t)),
-      accent: makeBuf(0.24, t => (square(620*t)+square(920*t))*Math.exp(-18*t))
-    };
-    function square(x){ return (x%1)<0.5?1:-1; }
+
+  // 3. Hi-Hat
+  function playHiHat(time, destNode, isAccent) {
+      const buffer = getNoiseBuffer(0.2); 
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+
+      const gainNode = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(6500, time); 
+
+      const peakGain = isAccent ? 0.6 : 0.5;
+      const decayTime = isAccent ? 0.09 : 0.08;
+      
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      source.connect(filter).connect(gainNode).connect(destNode);
+      source.start(time);
+      source.stop(time + 0.1);
   }
-  function woodblock(){ // replaces Hi Click
-    const e1=envExp(55), e2=envExp(65), sq=x=> (x%1)<0.5?1:-1;
-    return {
-      normal: makeBuf(0.028, t=> sq(20*t)*e1(t)),
-      accent: makeBuf(0.028, t=> sq(26*t)*e2(t))
-    };
+
+  // 4. Cowbell
+  function playCowbell(time, destNode, isAccent) { 
+      const baseFreq1 = isAccent ? 620 : 560;
+      const baseFreq2 = isAccent ? 920 : 845;
+      const decayRate = 18;
+      const duration = isAccent ? 0.24 : 0.20;
+      const peakGain = isAccent ? 0.8 : 0.7;
+
+      function square(freq, t) { return (freq * t % 1) < 0.5 ? 1 : -1; }
+      
+      const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0; i<data.length; i++) {
+          const t = i / audioCtx.sampleRate;
+          const env = Math.exp(-decayRate * t);
+          data[i] = peakGain * (square(baseFreq1, t) + square(baseFreq2, t)) * 0.5 * env;
+      }
+      
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(destNode);
+      source.start(time);
   }
-  function shaker(){ // replaces Wood
-    const e1=envExp(65), e2=envExp(75);
-    return {
-      normal: makeBuf(0.14, t => (Math.random()*2-1)*e1(t)),
-      accent: makeBuf(0.16, t => (Math.random()*2-1)*e2(t))
-    };
+
+  // 5. Woodblock
+  function playWoodBlock(time, destNode, isAccent) {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      const bandpass = audioCtx.createBiquadFilter();
+
+      const oscFreq = isAccent ? 1400 : 1200;
+      const peakGain = isAccent ? 0.8 : 0.6;
+      const decayTime = isAccent ? 0.06 : 0.05;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(oscFreq, time); 
+
+      bandpass.type = 'bandpass';
+      bandpass.frequency.setValueAtTime(oscFreq, time);
+      bandpass.Q.setValueAtTime(8, time); 
+
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      osc.connect(bandpass).connect(gainNode).connect(destNode);
+      osc.start(time);
+      osc.stop(time + 0.1);
   }
-  function nclap(){ // replaces Sound
-    const e=envExp(60);
-    return {
-      normal: makeBuf(0.12, t => (Math.random()*2-1)*e(t)),
-      accent: makeBuf(0.16, t => (Math.random()*2-1)*e(t))
-    };
+
+  // 6. Shaker
+  function playShaker(time, destNode, isAccent) {
+      const buffer = getNoiseBuffer(0.3); 
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+
+      const gainNode = audioCtx.createGain();
+      const highpass = audioCtx.createBiquadFilter();
+      const lowpass = audioCtx.createBiquadFilter();
+
+      highpass.type = 'highpass';
+      highpass.frequency.setValueAtTime(4500, time);
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(8000, time);
+
+      const peakGain = isAccent ? 0.5 : 0.4;
+      const decayTime = isAccent ? 0.22 : 0.2;
+      
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      source.connect(highpass).connect(lowpass).connect(gainNode).connect(destNode);
+      source.start(time);
+      source.stop(time + 0.3);
   }
-  function tom(){
-    return {
-      normal: makeBuf(0.12, t => Math.sin(2*Math.PI*(180 - 20*t)*t) * Math.exp(-22*t)),
-      accent: makeBuf(0.14, t => Math.sin(2*Math.PI*(210 - 25*t)*t) * Math.exp(-20*t))
-    };
+
+  // 7. Noise Clap (Sharper Pitched & Increased Volume)
+  function playClap(time, destNode, isAccent) {
+      const clapCount = 4;
+      const interval = 0.005; 
+      // *** MODIFIED: Increased peakGain to be comparable to Snare/HiHat ***
+      const peakGain = isAccent ? 0.6 : 0.5; 
+      const decayTime = isAccent ? 0.06 : 0.05;
+
+      for (let i = 0; i < clapCount; i++) {
+          const t = time + i * interval;
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = getNoiseBuffer(0.1); 
+
+          const gainNode = audioCtx.createGain();
+          const bandpass = audioCtx.createBiquadFilter();
+
+          bandpass.type = 'bandpass';
+          bandpass.frequency.setValueAtTime(1200, t); 
+          bandpass.Q.setValueAtTime(4, t); 
+
+          gainNode.gain.setValueAtTime(peakGain, t);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, t + decayTime); 
+
+          noise.connect(bandpass).connect(gainNode).connect(destNode);
+          noise.start(t);
+          noise.stop(t + 0.1);
+      }
   }
+  
+  // 8. Low Tom
+  function playLowTom(time, destNode, isAccent) {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = 'sine'; 
+      const baseFreq = isAccent ? 100 : 80;
+      const peakGain = isAccent ? 0.9 : 0.8;
+      const decayTime = isAccent ? 0.12 : 0.1;
+
+      osc.frequency.setValueAtTime(baseFreq, time); 
+
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      osc.connect(gainNode).connect(destNode);
+      osc.start(time);
+      osc.stop(time + 0.2);
+  }
+
+  // 9. High Tom
+  function playHighTom(time, destNode, isAccent) {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = 'sine'; 
+      const baseFreq = isAccent ? 200 : 180; 
+      const peakGain = isAccent ? 0.9 : 0.8;
+      const decayTime = isAccent ? 0.12 : 0.1;
+
+      osc.frequency.setValueAtTime(baseFreq, time); 
+
+      gainNode.gain.setValueAtTime(peakGain, time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + decayTime); 
+
+      osc.connect(gainNode).connect(destNode);
+      osc.start(time);
+      osc.stop(time + 0.2);
+  }
+  
 
   // ===== UI build
   function buildStepLights(){
@@ -461,9 +657,13 @@
       if (R.nextTime===0) R.nextTime = now + 0.08;
       while (R.nextTime < now + AHEAD_SEC){
         R.idx = (R.idx + 1) % L.beats;
-        const ins = bank[L.sound] || bank.woodblock;
-        const buf = (L.accent && R.idx===0) ? ins.accent : ins.normal;
-        schedule(buf, R.nextTime, R.gain);
+        
+        // NEW: Call instrument function directly instead of scheduling a buffer
+        const playSoundFunc = bank[L.sound] || bank.woodblock;
+        const isAccent = L.accent && R.idx===0;
+        
+        // All new sound functions take (time, destNode, isAccent)
+        playSoundFunc(R.nextTime, R.gain, isAccent); 
 
         // visuals (immediate + audio aligned)
         flashStep(i, R.idx, L.beats);
@@ -485,7 +685,9 @@
 
   function start(){
     if (timerId) return;
-    initAudio(); statVal.textContent='Running';
+    initAudio(); 
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    statVal.textContent='Running';
     rebuildPeriods(true);
     timerId = setInterval(scheduler, LOOKAHEAD_MS);
   }
